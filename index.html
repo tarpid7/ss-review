@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>Review</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap">
+<!--
+  Shell for the phone review page. Copied into the site repo by bin/ss-review-page.py: edit it in bin/, not in the repo.
+  This file is public, so it holds no names, no captions and no addresses. Everything it shows is read from
+  d/index.bin, which is sealed. The key arrives as #k=... in the link and is kept in this browser only.
+-->
+<style>
+  :root {
+    --bg: #F4F1EC;
+    --card: #FFFFFF;
+    --ink: #17181A;
+    --muted: #625D56;
+    --line: #E0DAD0;
+    --well: #F7F5F1;
+    --accent: #C4202A;
+    --accent-ink: #FFFFFF;
+    --yes: #1F7A4C;
+    --yes-bg: #E3F2E9;
+    --change: #8A5A00;
+    --change-bg: #FBEFD2;
+    --no: #9B1C24;
+    --no-bg: #F8E1E2;
+    --chip-ai: #5B3FA8;
+    --chip-ai-bg: #ECE7F8;
+    --shadow: 0 1px 2px rgba(23, 24, 26, 0.06), 0 6px 20px rgba(23, 24, 26, 0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121315;
+      --card: #1B1D20;
+      --ink: #F2EEE8;
+      --muted: #A8A29A;
+      --line: #2F3237;
+      --well: #23262A;
+      --accent: #EE5058;
+      --accent-ink: #17181A;
+      --yes: #6FD19C;
+      --yes-bg: #173426;
+      --change: #F0C060;
+      --change-bg: #3A2D10;
+      --no: #F28A90;
+      --no-bg: #3B181B;
+      --chip-ai: #BBA6F5;
+      --chip-ai-bg: #2A2342;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  .wrap {
+    max-width: 560px;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-top: calc(28px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  h1, h2, .num, .kicker, .week {
+    font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  }
+  .kicker {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 6px;
+    overflow-wrap: anywhere;
+  }
+  h1 {
+    font-size: 40px;
+    line-height: 1.02;
+    font-weight: 700;
+    margin: 0 0 12px;
+    text-wrap: balance;
+  }
+  .lede { margin: 0; color: var(--muted); max-width: 46ch; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+  .progress {
+    margin-top: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 15px;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--card);
+  }
+  .progress .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
+  .week {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 8px 0 -8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .week::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  .post {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .post-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+  .num {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 28px;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    line-height: 1;
+  }
+  .when { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .when strong { font-size: 17px; font-weight: 600; line-height: 1.2; }
+  .when span { font-size: 14px; color: var(--muted); }
+  .chip {
+    flex: none;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .chip.real { color: var(--yes); background: var(--yes-bg); }
+  .chip.ai { color: var(--chip-ai); background: var(--chip-ai-bg); }
+
+  .strip {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    background: var(--well);
+  }
+  .strip::-webkit-scrollbar { display: none; }
+  .strip figure {
+    flex: 0 0 100%;
+    margin: 0;
+    scroll-snap-align: start;
+    aspect-ratio: 4 / 5;
+    max-width: 100%;
+  }
+  .strip img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .strip img:not([src]) { visibility: hidden; }
+  .count {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    margin: 0;
+    padding: 8px 16px 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 16px; }
+  .label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 6px;
+  }
+  .cap-block { display: flex; flex-direction: column; }
+  .cap-text { white-space: pre-line; margin: 0; overflow-wrap: anywhere; }
+  .checks {
+    background: var(--well);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 14px;
+  }
+  .checks p:last-child { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+  .notice {
+    margin: 0;
+    background: var(--change-bg);
+    color: var(--change);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 15px;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+
+  button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  button:focus-visible, textarea:focus-visible, .strip:focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .copy {
+    align-self: flex-start;
+    margin-top: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: transparent;
+  }
+  .decide { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .decide button {
+    min-height: 48px;
+    font-size: 17px;
+    font-weight: 600;
+    border-radius: 10px;
+    border: 1.5px solid var(--line);
+    background: transparent;
+  }
+  .decide button[aria-pressed="true"][data-v="yes"] { background: var(--yes-bg); color: var(--yes); border-color: var(--yes); }
+  .decide button[aria-pressed="true"][data-v="change"] { background: var(--change-bg); color: var(--change); border-color: var(--change); }
+  .decide button[aria-pressed="true"][data-v="no"] { background: var(--no-bg); color: var(--no); border-color: var(--no); }
+  textarea {
+    width: 100%;
+    min-height: 72px;
+    font: inherit;
+    color: var(--ink);
+    background: var(--well);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    resize: vertical;
+  }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .panel h2 { font-size: 26px; font-weight: 700; line-height: 1.1; margin: 0; }
+  .panel p { margin: 0; color: var(--muted); }
+  #answers {
+    margin: 0;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 15px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: var(--well);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px;
+    min-height: 48px;
+  }
+  .primary {
+    min-height: 48px;
+    font-size: 17px;
+    font-weight: 600;
+    border: 0;
+    border-radius: 10px;
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .primary:disabled { opacity: 0.45; cursor: default; }
+  .secondary {
+    min-height: 44px;
+    font-size: 16px;
+    font-weight: 600;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ink);
+  }
+  a.secondary { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+  .panel p.sent { color: var(--yes); font-weight: 600; }
+  .panel p.warn { color: var(--no); font-weight: 600; }
+  .panel .small { font-size: 14px; }
+  .list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+  .list span { color: var(--muted); }
+  .foot { font-size: 14px; color: var(--muted); margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="lede">Loading.</p></div>
+
+<script>
+(function () {
+  var app = document.getElementById("app");
+  var KEY_STORE = "review-key";
+  var STATE_STORE = "review-answers";
+  var SENT_STORE = "review-sent";
+
+  function get(k, fallback) {
+    try { var v = JSON.parse(localStorage.getItem(k)); return v === null ? fallback : v; } catch (e) { return fallback; }
+  }
+  function put(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function drop(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+  // Builds one element. Text only ever goes in as text, never as markup.
+  function el(tag, attrs, kids) {
+    var node = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      if (k === "text") node.textContent = attrs[k];
+      else if (k === "hidden") node.hidden = !!attrs[k];
+      else node.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (kid) { if (kid) node.appendChild(kid); });
+    return node;
+  }
+  function plain(title, text) {
+    app.replaceChildren(el("header", {}, [el("h1", { text: title }), el("p", { class: "lede", text: text })]));
+  }
+
+  var fromLink = /(?:^#|&)k=([A-Za-z0-9_-]{43})(?:&|$)/.exec(location.hash);
+  var keyText = fromLink ? fromLink[1] : get(KEY_STORE, null);
+  if (!keyText || !window.crypto || !crypto.subtle) {
+    plain("Nothing to show here", "Open this page from the link in your notification.");
+    return;
+  }
+
+  function bytes(b64u) {
+    var s = b64u.replace(/-/g, "+").replace(/_/g, "/");
+    var bin = atob(s + "===".slice((s.length + 3) % 4));
+    var out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  var cryptoKey = crypto.subtle.importKey("raw", bytes(keyText), "AES-GCM", false, ["decrypt"]);
+
+  // A sealed file is a 12 byte IV followed by the AES-GCM ciphertext and tag.
+  function unseal(path, fresh) {
+    return fetch(path, fresh ? { cache: "no-store" } : {}).then(function (r) {
+      if (!r.ok) throw new Error("fetch");
+      return r.arrayBuffer();
+    }, function () { throw new Error("fetch"); }).then(function (buf) {
+      return cryptoKey.then(function (k) {
+        return crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(buf, 0, 12) }, k, new Uint8Array(buf, 12));
+      }).catch(function () { throw new Error("key"); });
+    });
+  }
+
+  var data = null;       // the unsealed payload
+  var lastText = null;   // its JSON text, to spot a new build
+  var lastLoad = 0;
+  var posts = [];        // [{id, digest, post, node}]
+  var state = get(STATE_STORE, {}) || {};
+  var sent = get(SENT_STORE, null);
+  var pictures = {};     // sealed file name -> promise of a blob URL
+  var ui = {};
+
+  // Photos load a few at a time, in page order.
+  var queue = [], busy = 0;
+  function pump() {
+    while (busy < 3 && queue.length) {
+      busy += 1;
+      queue.shift()().then(function () { busy -= 1; pump(); });
+    }
+  }
+  function picture(name) {
+    if (!pictures[name]) {
+      pictures[name] = new Promise(function (resolve) {
+        queue.push(function () {
+          return unseal("d/" + name, false).then(function (buf) {
+            resolve(URL.createObjectURL(new Blob([buf], { type: "image/jpeg" })));
+          }, function () { delete pictures[name]; resolve(null); });
+        });
+        pump();
+      });
+    }
+    return pictures[name];
+  }
+
+  function messageText() {
+    var lines = [], digest = null;
+    posts.forEach(function (p) {
+      var s = state[p.id];
+      if (!s || !s.v) return;
+      if (p.digest !== digest) { digest = p.digest; lines.push("digest " + digest); }
+      var line = p.post.n + " " + s.v;
+      var note = (s.note || "").replace(/\s+/g, " ").trim();
+      if (s.v === "change" && note) line += ": " + note;
+      lines.push(line);
+    });
+    return lines.join("\n");
+  }
+
+  function refresh() {
+    var done = 0;
+    posts.forEach(function (p) {
+      var s = state[p.id] || {};
+      if (s.v) done += 1;
+      p.node.querySelectorAll(".decide button").forEach(function (b) {
+        b.setAttribute("aria-pressed", String(b.getAttribute("data-v") === s.v));
+      });
+      var note = p.node.querySelector("textarea");
+      note.hidden = s.v !== "change";
+      if (document.activeElement !== note && note.value !== (s.note || "")) note.value = s.note || "";
+    });
+    if (!posts.length) return;
+    var text = messageText();
+    ui.progress.textContent = done + " of " + posts.length + " answered";
+    ui.answers.textContent = text || "No answers yet.";
+    ui.send.disabled = !text || ui.sending;
+    ui.status.className = "sent";
+    if (ui.sending) {
+      ui.send.textContent = "Sending";
+    } else if (text && sent && sent.text === text) {
+      ui.send.textContent = "Send again";
+      ui.status.hidden = false;
+      ui.status.textContent = "Sent " + sent.at + ". A push confirms it within a few minutes.";
+    } else if (text && sent) {
+      ui.send.textContent = "Send answers";
+      ui.status.hidden = false;
+      ui.status.textContent = "Your answers changed since you sent at " + sent.at + ". Tap Send answers again.";
+    } else {
+      ui.send.textContent = "Send answers";
+      ui.status.hidden = true;
+    }
+  }
+
+  function send() {
+    var text = messageText();
+    if (!text || ui.sending) return;
+    ui.sending = true;
+    ui.fallback.hidden = true;
+    refresh();
+    fetch("https://ntfy.sh/" + data.topic, { method: "POST", body: text }).then(function (r) {
+      if (!r.ok) throw new Error("send");
+      sent = { text: text, at: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) };
+      put(SENT_STORE, sent);
+      ui.sending = false;
+      refresh();
+    }).catch(function () {
+      ui.sending = false;
+      refresh();
+      ui.status.hidden = false;
+      ui.status.className = "warn";
+      ui.status.textContent = "That did not go through. Check your signal and try again, or use the link below.";
+      ui.fallback.setAttribute("href", "https://ntfy.sh/" + data.topic + "/publish?message=" + encodeURIComponent(text));
+      ui.fallback.hidden = false;
+    });
+  }
+
+  function copyFrom(source, btn, label) {
+    function ok() { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = label; }, 1600); }
+    function fail() {
+      try {
+        var r = document.createRange();
+        r.selectNodeContents(source);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+      } catch (e) {}
+      btn.textContent = "Selected. Press copy.";
+      setTimeout(function () { btn.textContent = label; }, 3000);
+    }
+    try { navigator.clipboard.writeText(source.textContent).then(ok, fail); } catch (e) { fail(); }
+  }
+
+  function postCard(p, manyBatches) {
+    var post = p.post, total = post.slides.length;
+    var strip = el("div", { class: "strip", "aria-label": (total > 1 ? "Slides" : "Photo") + " for post " + post.n });
+    if (total > 1) strip.setAttribute("tabindex", "0");
+    post.slides.forEach(function (slide) {
+      var img = el("img", { width: "1080", height: "1350", alt: slide.alt || "" });
+      strip.appendChild(el("figure", {}, [img]));
+      picture(slide.f).then(function (url) { if (url) img.src = url; });
+    });
+    var cur = el("span", { text: "1" });
+    strip.addEventListener("scroll", function () {
+      cur.textContent = String(Math.round(strip.scrollLeft / Math.max(1, strip.clientWidth)) + 1);
+    }, { passive: true });
+
+    var caption = el("p", { class: "cap-text", text: post.caption });
+    var copy = el("button", { class: "copy", type: "button", text: "Copy caption" });
+    copy.addEventListener("click", function () { copyFrom(caption, copy, "Copy caption"); });
+
+    var note = el("textarea", { hidden: true, maxlength: "500", "aria-label": "What should change on post " + post.n, placeholder: "What should change?" });
+    note.addEventListener("input", function () {
+      state[p.id] = { v: "change", note: note.value, rev: post.rev };
+      put(STATE_STORE, state);
+      refresh();
+    });
+    var decide = el("div", { class: "decide", role: "group", "aria-label": "Decision for post " + post.n });
+    [["yes", "Yes"], ["change", "Change"], ["no", "No"]].forEach(function (pair) {
+      var b = el("button", { type: "button", "data-v": pair[0], "aria-pressed": "false", text: pair[1] });
+      b.addEventListener("click", function () {
+        var old = state[p.id] || {};
+        if (old.v === pair[0]) delete state[p.id];
+        else state[p.id] = { v: pair[0], note: old.note || "", rev: post.rev };
+        put(STATE_STORE, state);
+        refresh();
+        if (state[p.id] && state[p.id].v === "change") note.focus();
+      });
+      decide.appendChild(b);
+    });
+
+    var chip = post.ai ? "AI-made cards" : (total > 1 ? "Real photos" : "Real photo");
+    var kind = post.kind + (manyBatches ? ", sent " + p.sent : "");
+    return el("article", { class: "post" }, [
+      el("div", { class: "post-head" }, [
+        el("span", { class: "num", text: post.n }),
+        el("div", { class: "when" }, [el("strong", { text: post.when }), el("span", { text: kind })]),
+        el("span", { class: "chip " + (post.ai ? "ai" : "real"), text: chip })
+      ]),
+      strip,
+      total > 1 ? el("p", { class: "count" }, [cur, document.createTextNode(" of " + total + ", swipe for more")]) : null,
+      el("div", { class: "body" }, [
+        el("div", { class: "cap-block" }, [el("p", { class: "label", text: "Caption" }), caption, copy]),
+        post.check ? el("div", { class: "checks" }, [el("p", { class: "label", text: "Check before it posts" }), el("p", { text: post.check })]) : null,
+        post.note ? el("p", { class: "notice", text: post.note }) : null,
+        decide,
+        note
+      ])
+    ]);
+  }
+
+  function render() {
+    posts = [];
+    data.digests.forEach(function (d) {
+      d.posts.forEach(function (post) { posts.push({ id: d.date + "/" + post.n, digest: d.date, sent: d.label, post: post }); });
+    });
+    // Drop saved taps for posts that are gone or that changed on the shop computer since the tap.
+    var live = {};
+    posts.forEach(function (p) { live[p.id] = p.post.rev; });
+    Object.keys(state).forEach(function (id) { if (live[id] !== state[id].rev) delete state[id]; });
+    put(STATE_STORE, state);
+
+    var count = posts.length;
+    var title = count === 0 ? "Nothing is waiting on you" : count === 1 ? "One post waiting for your yes" : count + " posts waiting for your yes";
+    var lede = el("p", { class: "lede" });
+    if (count) {
+      lede.appendChild(el("strong", { text: data.posting ? "None of these has been posted." : "Nothing has been posted." }));
+      lede.appendChild(document.createTextNode(" Tap yes, change or no on each one, then tap Send answers at the bottom."));
+    } else {
+      lede.textContent = "Every post has an answer. The next batch arrives Monday morning with a push.";
+    }
+    ui = { progress: el("span", { text: "" }) };
+    var kids = [el("header", {}, [
+      el("p", { class: "kicker", text: data.handle }),
+      el("h1", { text: title }),
+      lede,
+      count ? el("div", { class: "progress", "aria-live": "polite" }, [el("span", { class: "dot" }), ui.progress]) : null
+    ])];
+
+    var week = null;
+    posts.forEach(function (p) {
+      if (p.post.week !== week) { week = p.post.week; kids.push(el("p", { class: "week", text: week })); }
+      p.node = postCard(p, data.digests.length > 1);
+      kids.push(p.node);
+    });
+
+    if (count) {
+      ui.answers = el("pre", { id: "answers" });
+      ui.send = el("button", { class: "primary", type: "button", text: "Send answers" });
+      ui.send.addEventListener("click", send);
+      ui.status = el("p", { class: "sent", "aria-live": "polite", hidden: true });
+      ui.fallback = el("a", { class: "secondary", target: "_blank", rel: "noopener", hidden: true, text: "Send with a link" });
+      var copyAll = el("button", { class: "secondary", type: "button", text: "Copy answers instead" });
+      copyAll.addEventListener("click", function () { copyFrom(ui.answers, copyAll, "Copy answers instead"); });
+      kids.push(el("section", { class: "panel" }, [
+        el("h2", { text: "Your answers" }),
+        el("p", { text: "Send answers goes straight to the shop computer. Yes approves the post. Change comes back to you as a new draft. No sets it aside." + (data.posting ? "" : " Nothing goes on Instagram yet.") }),
+        ui.answers,
+        ui.send,
+        ui.status,
+        ui.fallback,
+        el("p", { class: "small", text: "You can change an answer and send again any time before a post goes out." }),
+        copyAll,
+        el("p", { class: "small", text: "If no push comes, copy the answers and send them to Claude in the sign shop session." })
+      ]));
+    }
+
+    if (data.approved.length) {
+      var list = el("ol", { class: "list" });
+      data.approved.forEach(function (a) {
+        list.appendChild(el("li", {}, [document.createTextNode(a.title + " "), el("span", { text: a.when })]));
+      });
+      kids.push(el("section", { class: "panel" }, [
+        el("h2", { text: "Approved" }),
+        el("p", { text: data.posting ? "These go out at the times shown." : "These are approved and holding. Instagram posting is not connected yet, so nothing goes out." }),
+        list
+      ]));
+    }
+    if (data.needs.length) {
+      var needs = el("ol", { class: "list" });
+      data.needs.forEach(function (n) { needs.appendChild(el("li", { text: n })); });
+      kids.push(el("section", { class: "panel" }, [el("h2", { text: "Also needed from you" }), needs]));
+    }
+    kids.push(el("p", { class: "foot", text: "Real photos are cropped only, never retouched. Tip cards are AI-made text graphics and show no job." }));
+    app.replaceChildren.apply(app, kids);
+    refresh();
+  }
+
+  function load() {
+    lastLoad = Date.now();
+    return unseal("d/index.bin?t=" + lastLoad, true).then(function (buf) {
+      var text = new TextDecoder().decode(buf);
+      if (fromLink) put(KEY_STORE, keyText);
+      if (text === lastText) return;
+      lastText = text;
+      data = JSON.parse(text);
+      render();
+    }, function (err) {
+      if (data) return;  // keep showing what we have
+      if (err.message === "key") {
+        if (!fromLink) drop(KEY_STORE);
+        plain("This link is out of date", "Open the newest notification from the shop computer.");
+      } else {
+        plain("Could not load", "Check your signal, then pull down to reload.");
+      }
+    });
+  }
+
+  // Coming back to the page after a while picks up a new build, unless a note is being typed.
+  document.addEventListener("visibilitychange", function () {
+    var typing = document.activeElement && document.activeElement.tagName === "TEXTAREA";
+    if (document.visibilityState === "visible" && !typing && Date.now() - lastLoad > 30000) load();
+  });
+  load();
+})();
+</script>
+</body>
+</html>
