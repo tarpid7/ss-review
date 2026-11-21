@@ -235,6 +235,10 @@
     border: 1px solid var(--line);
     background: transparent;
   }
+  .cap-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cap-edit { min-height: 200px; }
+  .cap-note { margin: 10px 0 0; font-size: 14px; font-weight: 600; color: var(--change); }
+  .cap-note.bad { color: var(--no); }
   .decide { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .decide button {
     min-height: 48px;
@@ -400,16 +404,68 @@
     return pictures[name];
   }
 
-  function messageText() {
-    var lines = [], digest = null;
+  // One message to the shop computer has to stay well under 4096 bytes, so a long batch goes as several.
+  var MAX_MESSAGE = 3600, MAX_CAPTION = 3300;
+  function size(text) { return new TextEncoder().encode(text).length; }
+  // A caption as typed: plain line breaks, no trailing spaces, no more than one blank line in a row.
+  function tidy(text) {
+    return String(text || "").replace(/\r\n?|[\u0085\u2028\u2029]/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  // The viewer's own wording for a post, or "" when the caption is as the shop computer wrote it.
+  function edited(p) {
+    var s = state[p.id];
+    var cap = s && s.cap ? tidy(s.cap) : "";
+    return cap && cap !== tidy(p.post.caption) ? cap : "";
+  }
+  function capLine(p) {
+    var cap = edited(p);
+    return cap ? p.post.n + " caption " + JSON.stringify(cap) : "";
+  }
+  function tooLong(p) { return size(capLine(p)) > MAX_CAPTION; }
+  // Saves one post's answer and edit together; an entry with neither is dropped.
+  function store(p, change) {
+    var old = state[p.id] || {};
+    var s = { rev: p.post.rev, v: old.v, note: old.note || "", cap: old.cap };
+    Object.keys(change).forEach(function (k) { s[k] = change[k]; });
+    if (!s.v) { delete s.v; delete s.note; }
+    if (!s.cap) delete s.cap;
+    if (s.v || s.cap) state[p.id] = s; else delete state[p.id];
+    put(STATE_STORE, state);
+  }
+
+  // What goes to the shop computer: [{digest, line, show}], a caption line before the answer for the same post.
+  function wire() {
+    var out = [];
     posts.forEach(function (p) {
       var s = state[p.id];
-      if (!s || !s.v) return;
-      if (p.digest !== digest) { digest = p.digest; lines.push("digest " + digest); }
+      if (!s) return;
+      var cap = capLine(p);
+      if (cap && !tooLong(p)) out.push({ digest: p.digest, line: cap, show: p.post.n + " caption edited" });
+      if (!s.v) return;
       var line = p.post.n + " " + s.v;
       var note = (s.note || "").replace(/\s+/g, " ").trim();
       if (s.v === "change" && note) line += ": " + note;
-      lines.push(line);
+      out.push({ digest: p.digest, line: line, show: line });
+    });
+    return out;
+  }
+  function messages() {
+    var out = [], cur = "", digest = null;
+    wire().forEach(function (w) {
+      var head = "digest " + w.digest;
+      if (cur && size(cur + "\n" + head + "\n" + w.line) > MAX_MESSAGE) { out.push(cur); cur = ""; digest = null; }
+      if (w.digest !== digest) { digest = w.digest; cur += (cur ? "\n" : "") + head; }
+      cur += "\n" + w.line;
+    });
+    if (cur) out.push(cur);
+    return out;
+  }
+  function messageText() { return messages().join("\n"); }
+  function previewText() {
+    var lines = [], digest = null;
+    wire().forEach(function (w) {
+      if (w.digest !== digest) { digest = w.digest; lines.push("digest " + digest); }
+      lines.push(w.show);
     });
     return lines.join("\n");
   }
@@ -422,14 +478,21 @@
       p.node.querySelectorAll(".decide button").forEach(function (b) {
         b.setAttribute("aria-pressed", String(b.getAttribute("data-v") === s.v));
       });
-      var note = p.node.querySelector("textarea");
+      var note = p.node.querySelector(".note");
       note.hidden = s.v !== "change";
       if (document.activeElement !== note && note.value !== (s.note || "")) note.value = s.note || "";
+      var cap = edited(p), long = !!cap && tooLong(p);
+      p.node.querySelector(".cap-text").textContent = cap || p.post.caption;
+      p.node.querySelector(".cap-undo").hidden = !cap;
+      var capNote = p.node.querySelector(".cap-note");
+      capNote.hidden = !cap;
+      capNote.className = "cap-note" + (long ? " bad" : "");
+      capNote.textContent = long ? "This caption is too long to send. Shorten it." : "Your wording. It is saved when you tap Send answers.";
     });
     if (!posts.length) return;
     var text = messageText();
     ui.progress.textContent = done + " of " + posts.length + " answered";
-    ui.answers.textContent = text || "No answers yet.";
+    ui.answers.textContent = previewText() || "No answers yet.";
     ui.send.disabled = !text || ui.sending;
     ui.status.className = "sent";
     if (ui.sending) {
@@ -449,13 +512,17 @@
   }
 
   function send() {
-    var text = messageText();
+    var parts = messages(), text = parts.join("\n");
     if (!text || ui.sending) return;
     ui.sending = true;
     ui.fallback.hidden = true;
     refresh();
-    fetch("https://ntfy.sh/" + data.topic, { method: "POST", body: text }).then(function (r) {
-      if (!r.ok) throw new Error("send");
+    // One after the other, in order: a caption edit has to land before the yes for the same post.
+    parts.reduce(function (before, body) {
+      return before.then(function () {
+        return fetch("https://ntfy.sh/" + data.topic, { method: "POST", body: body });
+      }).then(function (r) { if (!r.ok) throw new Error("send"); });
+    }, Promise.resolve()).then(function () {
       sent = { text: text, at: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) };
       put(SENT_STORE, sent);
       ui.sending = false;
@@ -463,18 +530,24 @@
     }).catch(function () {
       ui.sending = false;
       refresh();
+      // A link can only carry a short message, so an edited caption has no link to fall back on.
+      var short = parts.length === 1 && text.length <= 1200;
       ui.status.hidden = false;
       ui.status.className = "warn";
-      ui.status.textContent = "That did not go through. Check your signal and try again, or use the link below.";
-      ui.fallback.setAttribute("href", "https://ntfy.sh/" + data.topic + "/publish?message=" + encodeURIComponent(text));
-      ui.fallback.hidden = false;
+      ui.status.textContent = "That did not go through. Check your signal and try again" + (short ? ", or use the link below." : ".");
+      if (short) {
+        ui.fallback.setAttribute("href", "https://ntfy.sh/" + data.topic + "/publish?message=" + encodeURIComponent(text));
+        ui.fallback.hidden = false;
+      }
     });
   }
 
-  function copyFrom(source, btn, label) {
+  // Copies source's text, or the given text when the box shows something shorter than what is sent.
+  function copyFrom(source, btn, label, text) {
     function ok() { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = label; }, 1600); }
     function fail() {
       try {
+        if (text != null) source.textContent = text;
         var r = document.createRange();
         r.selectNodeContents(source);
         var sel = window.getSelection();
@@ -484,7 +557,7 @@
       btn.textContent = "Selected. Press copy.";
       setTimeout(function () { btn.textContent = label; }, 3000);
     }
-    try { navigator.clipboard.writeText(source.textContent).then(ok, fail); } catch (e) { fail(); }
+    try { navigator.clipboard.writeText(text != null ? text : source.textContent).then(ok, fail); } catch (e) { fail(); }
   }
 
   function postCard(p, manyBatches) {
@@ -505,10 +578,32 @@
     var copy = el("button", { class: "copy", type: "button", text: "Copy caption" });
     copy.addEventListener("click", function () { copyFrom(caption, copy, "Copy caption"); });
 
-    var note = el("textarea", { hidden: true, maxlength: "500", "aria-label": "What should change on post " + post.n, placeholder: "What should change?" });
+    // Edit caption swaps the text for a box. What is typed there is the caption, word for word.
+    var editor = el("textarea", { class: "cap-edit", hidden: true, maxlength: "2200", "aria-label": "Caption for post " + post.n });
+    var edit = el("button", { class: "copy", type: "button", "aria-expanded": "false", text: "Edit caption" });
+    var undo = el("button", { class: "copy cap-undo", type: "button", hidden: true, text: "Undo my edit" });
+    function editing(on) {
+      if (on) editor.value = edited(p) || post.caption;
+      editor.hidden = !on;
+      caption.hidden = on;
+      edit.textContent = on ? "Done" : "Edit caption";
+      edit.setAttribute("aria-expanded", String(on));
+      if (on) editor.focus();
+    }
+    edit.addEventListener("click", function () { editing(editor.hidden); });
+    editor.addEventListener("input", function () {
+      store(p, { cap: tidy(editor.value) === tidy(post.caption) ? "" : editor.value });
+      refresh();
+    });
+    undo.addEventListener("click", function () {
+      store(p, { cap: "" });
+      editing(false);
+      refresh();
+    });
+
+    var note = el("textarea", { class: "note", hidden: true, maxlength: "500", "aria-label": "What should change on post " + post.n, placeholder: "What should change?" });
     note.addEventListener("input", function () {
-      state[p.id] = { v: "change", note: note.value, rev: post.rev };
-      put(STATE_STORE, state);
+      store(p, { v: "change", note: note.value });
       refresh();
     });
     var decide = el("div", { class: "decide", role: "group", "aria-label": "Decision for post " + post.n });
@@ -516,9 +611,7 @@
       var b = el("button", { type: "button", "data-v": pair[0], "aria-pressed": "false", text: pair[1] });
       b.addEventListener("click", function () {
         var old = state[p.id] || {};
-        if (old.v === pair[0]) delete state[p.id];
-        else state[p.id] = { v: pair[0], note: old.note || "", rev: post.rev };
-        put(STATE_STORE, state);
+        store(p, { v: old.v === pair[0] ? "" : pair[0] });
         refresh();
         if (state[p.id] && state[p.id].v === "change") note.focus();
       });
@@ -536,7 +629,11 @@
       strip,
       total > 1 ? el("p", { class: "count" }, [cur, document.createTextNode(" of " + total + ", swipe for more")]) : null,
       el("div", { class: "body" }, [
-        el("div", { class: "cap-block" }, [el("p", { class: "label", text: "Caption" }), caption, copy]),
+        el("div", { class: "cap-block" }, [
+          el("p", { class: "label", text: "Caption" }), caption, editor,
+          el("p", { class: "cap-note", hidden: true }),
+          el("div", { class: "cap-actions" }, [edit, copy, undo])
+        ]),
         post.check ? el("div", { class: "checks" }, [el("p", { class: "label", text: "Check before it posts" }), el("p", { text: post.check })]) : null,
         post.note ? el("p", { class: "notice", text: post.note }) : null,
         decide,
@@ -561,7 +658,7 @@
     var lede = el("p", { class: "lede" });
     if (count) {
       lede.appendChild(el("strong", { text: data.posting ? "None of these has been posted." : "Nothing has been posted." }));
-      lede.appendChild(document.createTextNode(" Tap yes, change or no on each one, then tap Send answers at the bottom."));
+      lede.appendChild(document.createTextNode(" Tap yes, change or no on each one, then tap Send answers at the bottom. Tap Edit caption to fix the wording yourself."));
     } else {
       lede.textContent = "Every post has an answer. The next batch arrives Monday morning with a push.";
     }
@@ -587,10 +684,10 @@
       ui.status = el("p", { class: "sent", "aria-live": "polite", hidden: true });
       ui.fallback = el("a", { class: "secondary", target: "_blank", rel: "noopener", hidden: true, text: "Send with a link" });
       var copyAll = el("button", { class: "secondary", type: "button", text: "Copy answers instead" });
-      copyAll.addEventListener("click", function () { copyFrom(ui.answers, copyAll, "Copy answers instead"); });
+      copyAll.addEventListener("click", function () { copyFrom(ui.answers, copyAll, "Copy answers instead", messageText()); });
       kids.push(el("section", { class: "panel" }, [
         el("h2", { text: "Your answers" }),
-        el("p", { text: "Send answers goes straight to the shop computer. Yes approves the post. Change comes back to you as a new draft. No sets it aside." + (data.posting ? "" : " Nothing goes on Instagram yet.") }),
+        el("p", { text: "Send answers goes straight to the shop computer. Yes approves the post. Change comes back to you as a new draft. No sets it aside. A caption you edit is saved the way you wrote it." + (data.posting ? "" : " Nothing goes on Instagram yet.") }),
         ui.answers,
         ui.send,
         ui.status,
