@@ -709,6 +709,15 @@
         list
       ]));
     }
+    if (data.results && data.results.length) {
+      var res = el("ul", { class: "list" });
+      data.results.concat(data.learned || []).forEach(function (r) { res.appendChild(el("li", { text: r })); });
+      kids.push(el("section", { class: "panel" }, [
+        el("h2", { text: "How the posts did" }),
+        el("p", { text: "Read from Instagram" + (data.results_read ? " on " + data.results_read : "") + ". Updated every Monday." }),
+        res
+      ]));
+    }
     if (data.needs.length) {
       var needs = el("ol", { class: "list" });
       data.needs.forEach(function (n) { needs.appendChild(el("li", { text: n })); });
